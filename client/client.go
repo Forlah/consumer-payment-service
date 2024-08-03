@@ -39,7 +39,7 @@ func (p *paymentAPIClient) MakeDeposit(accountId, reference string, amount float
 	resp, err := p.restClient.
 		R().
 		SetResult(&PaymentResponse{}).
-		SetError(&PaymentResponse{}).
+		SetError(&ErrorResponse{}).
 		SetBody(payload).
 		Post(url)
 	if err != nil {
@@ -64,7 +64,7 @@ func (p *paymentAPIClient) MakeWithdrawal(accountId, reference string, amount fl
 	resp, err := p.restClient.
 		R().
 		SetResult(&PaymentResponse{}).
-		SetError(&PaymentResponse{}).
+		SetError(&ErrorResponse{}).
 		SetBody(payload).
 		Post(url)
 	if err != nil {
@@ -80,5 +80,20 @@ func (p *paymentAPIClient) MakeWithdrawal(accountId, reference string, amount fl
 }
 
 func (p *paymentAPIClient) RetrieveTransaction(reference string) (*PaymentResponse, error) {
-	return nil, nil
+	url := fmt.Sprintf("%s/payments/%s", p.config.THIRD_PARTY_SERVICE_BASE_URL, reference)
+	resp, err := p.restClient.
+		R().
+		SetResult(&PaymentResponse{}).
+		SetError(&ErrorResponse{}).
+		Get(url)
+	if err != nil {
+		log.Printf("error retrieving payment %v", err)
+		return nil, err
+	}
+
+	if resp.IsError() {
+		return nil, fmt.Errorf("retrieve payment error httpCode: %d, message: %s ", resp.StatusCode(), resp.Body())
+	}
+
+	return resp.Result().(*PaymentResponse), nil
 }
