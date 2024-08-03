@@ -63,7 +63,7 @@ func (handler *HttpHandler) PaymentCreditHandler(w http.ResponseWriter, r *http.
 	// validate account exist
 	account, err := handler.mongodbStore.GetAccountByID(payload.AccountId)
 	if err != nil {
-		handler.responseWriter(w, http.StatusNotFound)
+		handler.responseWriter(w, http.StatusInternalServerError)
 		return
 	}
 
@@ -86,15 +86,14 @@ func (handler *HttpHandler) PaymentCreditHandler(w http.ResponseWriter, r *http.
 
 	err = handler.mongodbStore.CreateTransaction(transaction)
 	if err != nil {
-		// should never happen.
-		handler.responseWriter(w, http.StatusNoContent)
+		log.Println("error creating transaction")
+		handler.responseWriter(w, http.StatusNotFound)
 		return
 	}
 
 	newBalance := account.Balance + payload.Amount
 
 	if err = handler.mongodbStore.UpdateAccountBalance(payload.AccountId, newBalance); err != nil {
-		// should never happen.
 		handler.responseWriter(w, http.StatusNotFound)
 		return
 	}
@@ -123,6 +122,13 @@ func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// validate user exist
+	if _, err = handler.mongodbStore.GetUserById(payload.UserId); err != nil {
+		log.Printf("error getting user %v", err)
+		handler.responseWriter(w, http.StatusInternalServerError)
+		return
+	}
+
 	// validate account exist
 	account, err := handler.mongodbStore.GetAccountByID(payload.AccountId)
 	if err != nil {
@@ -132,6 +138,7 @@ func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.R
 
 	// check balance
 	if payload.Amount > float64(account.Balance) {
+		log.Println("insufficient balance")
 		handler.responseWriter(w, http.StatusInternalServerError)
 		return
 	}
@@ -157,13 +164,11 @@ func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.R
 
 	err = handler.mongodbStore.CreateTransaction(transaction)
 	if err != nil {
-		// should never happen.
 		handler.responseWriter(w, http.StatusInternalServerError)
 		return
 	}
 
 	if err = handler.mongodbStore.UpdateAccountBalance(payload.AccountId, newBalance); err != nil {
-		// should never happen.
 		handler.responseWriter(w, http.StatusInternalServerError)
 		return
 	}

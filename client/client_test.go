@@ -300,6 +300,9 @@ func Test_PaymentClient_RetrievePayment(t *testing.T) {
 		THIRD_PARTY_SERVICE_BASE_URL: "http://example.domain.com/third-party",
 	}
 
+	newPaymentAPIClient := NewPaymentAPIClient(cfg)
+	assert.NotNil(t, newPaymentAPIClient)
+
 	httpClient := resty.New()
 
 	paymentAPIClient := &paymentAPIClient{
