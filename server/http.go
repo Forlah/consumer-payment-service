@@ -16,7 +16,7 @@ func MountServer(cfg *environment.Config, mongodbStore database.MongoDBStore, pa
 
 	// service check
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome our consumer payment service"))
+		w.Write([]byte("a simple banking app service"))
 	})
 
 	router.Post("/payments/debit", httpHandler.PaymentDebitHandler)
