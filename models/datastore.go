@@ -1,7 +1,7 @@
 package models
 
 type User struct {
-	Id        string `bson:"id"`
+	Id        string `bson:"user_id"`
 	AccountID string `bson:"account_id"`
 	Name      string `bson:"account"`
 	CreatedAt int64  `bson:"created_at"`
