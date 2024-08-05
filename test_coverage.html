@@ -61,7 +61,7 @@
 				
 				<option value="file2">consumer-payment-service/server/http.go (85.7%)</option>
 				
-				<option value="file3">consumer-payment-service/server/http_handlers.go (85.0%)</option>
+				<option value="file3">consumer-payment-service/server/http_handlers.go (86.0%)</option>
 				
 				</select>
 			</div>
@@ -356,11 +356,28 @@ func NewHTTPHandler(config *environment.Config, store database.MongoDBStore, pay
         return &amp;HttpHandler{config: config, mongodbStore: store, paymentClient: paymentClient}
 }</span>
 
-func (handler *HttpHandler) responseWriter(w http.ResponseWriter, codes ...int) <span class="cov8" title="1">{
+func (handler *HttpHandler) responseWriter(w http.ResponseWriter, response any, codes ...int) <span class="cov8" title="1">{
         statusCode := http.StatusOK
         if len(codes) &gt; 0 </span><span class="cov8" title="1">{
                 statusCode = codes[0]
         }</span>
+
+        <span class="cov8" title="1">if response != nil </span><span class="cov8" title="1">{
+                data, err := json.Marshal(response)
+                if err != nil </span><span class="cov8" title="1">{
+                        log.Println("Error marshalling response")
+                        w.Header().Set("Content-Type", "application/json")
+                        w.WriteHeader(http.StatusBadRequest)
+                        return
+                }</span>
+
+                <span class="cov8" title="1">w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(statusCode)
+                if _, err := w.Write(data); err != nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+                <span class="cov8" title="1">return</span>
+        }
 
         <span class="cov8" title="1">w.WriteHeader(statusCode)</span>
 }
@@ -390,21 +407,21 @@ func (handler *HttpHandler) PaymentCreditHandler(w http.ResponseWriter, r *http.
         // validate user exist
         <span class="cov8" title="1">if _, err = handler.mongodbStore.GetUserById(payload.UserId); err != nil </span><span class="cov8" title="1">{
                 log.Printf("error getting user %v", err)
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
         // validate account exist
         <span class="cov8" title="1">account, err := handler.mongodbStore.GetAccountByID(payload.AccountId)
         if err != nil </span><span class="cov8" title="1">{
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
         // make credit API call to third party service
         <span class="cov8" title="1">resp, err := handler.paymentClient.MakeDeposit(payload.AccountId, payload.Reference, payload.Amount)
         if err != nil </span><span class="cov8" title="1">{
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
@@ -421,18 +438,18 @@ func (handler *HttpHandler) PaymentCreditHandler(w http.ResponseWriter, r *http.
         err = handler.mongodbStore.CreateTransaction(transaction)
         if err != nil </span><span class="cov8" title="1">{
                 log.Println("error creating transaction")
-                handler.responseWriter(w, http.StatusNotFound)
+                handler.responseWriter(w, nil, http.StatusNotFound)
                 return
         }</span>
 
         <span class="cov8" title="1">newBalance := account.Balance + payload.Amount
 
         if err = handler.mongodbStore.UpdateAccountBalance(payload.AccountId, newBalance); err != nil </span><span class="cov8" title="1">{
-                handler.responseWriter(w, http.StatusNotFound)
+                handler.responseWriter(w, nil, http.StatusNotFound)
                 return
         }</span>
 
-        <span class="cov8" title="1">handler.responseWriter(w)</span>
+        <span class="cov8" title="1">handler.responseWriter(w, nil)</span>
 }
 
 func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
@@ -459,28 +476,31 @@ func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.R
         // validate user exist
         <span class="cov8" title="1">if _, err = handler.mongodbStore.GetUserById(payload.UserId); err != nil </span><span class="cov8" title="1">{
                 log.Printf("error getting user %v", err)
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
         // validate account exist
         <span class="cov8" title="1">account, err := handler.mongodbStore.GetAccountByID(payload.AccountId)
         if err != nil </span><span class="cov8" title="1">{
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
         // check balance
         <span class="cov8" title="1">if payload.Amount &gt; float64(account.Balance) </span><span class="cov8" title="1">{
                 log.Println("insufficient balance")
-                handler.responseWriter(w, http.StatusInternalServerError)
+                response := models.ErrorResponse{
+                        ErrorMessage: "insufficient balance",
+                }
+                handler.responseWriter(w, response, http.StatusInternalServerError)
                 return
         }</span>
 
         // make API call to third party payment service for debit
         <span class="cov8" title="1">resp, err := handler.paymentClient.MakeWithdrawal(payload.AccountId, payload.Reference, payload.Amount)
         if err != nil </span><span class="cov8" title="1">{
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
@@ -498,16 +518,16 @@ func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.R
 
         err = handler.mongodbStore.CreateTransaction(transaction)
         if err != nil </span><span class="cov8" title="1">{
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
         <span class="cov8" title="1">if err = handler.mongodbStore.UpdateAccountBalance(payload.AccountId, newBalance); err != nil </span><span class="cov8" title="1">{
-                handler.responseWriter(w, http.StatusInternalServerError)
+                handler.responseWriter(w, nil, http.StatusInternalServerError)
                 return
         }</span>
 
-        <span class="cov8" title="1">handler.responseWriter(w)</span>
+        <span class="cov8" title="1">handler.responseWriter(w, nil)</span>
 }
 </pre>
 		

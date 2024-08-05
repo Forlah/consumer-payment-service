@@ -284,6 +284,7 @@ func Test_HttpHandler_PaymentDebit(t *testing.T) {
 		errorMakingWithdrawal
 		errorCreatingTransaction
 		errorUpdatingAccountBalance
+		errorMarshalResponse
 	)
 
 	testCases := []struct {
@@ -308,6 +309,11 @@ func Test_HttpHandler_PaymentDebit(t *testing.T) {
 		{
 			name:     "Test error insufficient balance",
 			testType: errorInsufficientBalance,
+		},
+
+		{
+			name:     "Test error serializing response",
+			testType: errorMarshalResponse,
 		},
 
 		{
@@ -446,6 +452,14 @@ func Test_HttpHandler_PaymentDebit(t *testing.T) {
 
 				handler.PaymentDebitHandler(w, r)
 				assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+			case errorMarshalResponse:
+				w := httptest.NewRecorder()
+				input := map[string]interface{}{
+					"test": make(chan int),
+				}
+				handler.responseWriter(w, input)
+				assert.Equal(t, http.StatusBadRequest, w.Code)
 
 			case errorMakingWithdrawal:
 				mockAccount := models.Account{

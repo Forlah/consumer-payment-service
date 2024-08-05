@@ -22,10 +22,27 @@ func NewHTTPHandler(config *environment.Config, store database.MongoDBStore, pay
 	return &HttpHandler{config: config, mongodbStore: store, paymentClient: paymentClient}
 }
 
-func (handler *HttpHandler) responseWriter(w http.ResponseWriter, codes ...int) {
+func (handler *HttpHandler) responseWriter(w http.ResponseWriter, response any, codes ...int) {
 	statusCode := http.StatusOK
 	if len(codes) > 0 {
 		statusCode = codes[0]
+	}
+
+	if response != nil {
+		data, err := json.Marshal(response)
+		if err != nil {
+			log.Println("Error marshalling response")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		if _, err := w.Write(data); err != nil {
+			return
+		}
+		return
 	}
 
 	w.WriteHeader(statusCode)
@@ -56,21 +73,21 @@ func (handler *HttpHandler) PaymentCreditHandler(w http.ResponseWriter, r *http.
 	// validate user exist
 	if _, err = handler.mongodbStore.GetUserById(payload.UserId); err != nil {
 		log.Printf("error getting user %v", err)
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
 	// validate account exist
 	account, err := handler.mongodbStore.GetAccountByID(payload.AccountId)
 	if err != nil {
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
 	// make credit API call to third party service
 	resp, err := handler.paymentClient.MakeDeposit(payload.AccountId, payload.Reference, payload.Amount)
 	if err != nil {
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
@@ -87,18 +104,18 @@ func (handler *HttpHandler) PaymentCreditHandler(w http.ResponseWriter, r *http.
 	err = handler.mongodbStore.CreateTransaction(transaction)
 	if err != nil {
 		log.Println("error creating transaction")
-		handler.responseWriter(w, http.StatusNotFound)
+		handler.responseWriter(w, nil, http.StatusNotFound)
 		return
 	}
 
 	newBalance := account.Balance + payload.Amount
 
 	if err = handler.mongodbStore.UpdateAccountBalance(payload.AccountId, newBalance); err != nil {
-		handler.responseWriter(w, http.StatusNotFound)
+		handler.responseWriter(w, nil, http.StatusNotFound)
 		return
 	}
 
-	handler.responseWriter(w)
+	handler.responseWriter(w, nil)
 }
 
 func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.Request) {
@@ -125,28 +142,31 @@ func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.R
 	// validate user exist
 	if _, err = handler.mongodbStore.GetUserById(payload.UserId); err != nil {
 		log.Printf("error getting user %v", err)
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
 	// validate account exist
 	account, err := handler.mongodbStore.GetAccountByID(payload.AccountId)
 	if err != nil {
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
 	// check balance
 	if payload.Amount > float64(account.Balance) {
 		log.Println("insufficient balance")
-		handler.responseWriter(w, http.StatusInternalServerError)
+		response := models.ErrorResponse{
+			ErrorMessage: "insufficient balance",
+		}
+		handler.responseWriter(w, response, http.StatusInternalServerError)
 		return
 	}
 
 	// make API call to third party payment service for debit
 	resp, err := handler.paymentClient.MakeWithdrawal(payload.AccountId, payload.Reference, payload.Amount)
 	if err != nil {
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
@@ -164,14 +184,14 @@ func (handler *HttpHandler) PaymentDebitHandler(w http.ResponseWriter, r *http.R
 
 	err = handler.mongodbStore.CreateTransaction(transaction)
 	if err != nil {
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
 	if err = handler.mongodbStore.UpdateAccountBalance(payload.AccountId, newBalance); err != nil {
-		handler.responseWriter(w, http.StatusInternalServerError)
+		handler.responseWriter(w, nil, http.StatusInternalServerError)
 		return
 	}
 
-	handler.responseWriter(w)
+	handler.responseWriter(w, nil)
 }

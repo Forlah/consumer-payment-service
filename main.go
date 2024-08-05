@@ -25,7 +25,7 @@ func main() {
 	// Get mongodb instance
 	store, _, err := mongodb.New(cfg.DatabaseURI, cfg.DatabaseName)
 	if err != nil {
-		log.Fatal("failed to establish MongoDB connection")
+		log.Fatal("failed to establish MongoDB connection ", cfg.DatabaseURI)
 	}
 
 	// Get instance of third party payment service client

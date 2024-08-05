@@ -362,7 +362,6 @@ func TestMongoStore_GetUserById(t *testing.T) {
 
 			mockUser := &models.User{
 				Id:        testCase.userID,
-				AccountID: "acc-0001",
 				Name:      "name",
 				CreatedAt: time.Now().Unix(),
 			}
