@@ -23,3 +23,12 @@ go.work.sum
 
 # env file
 .env
+
+#
+.vscode/
+
+# Mac os
+.DS_Store
+
+# ignore auto generated mocks
+**/mocks
